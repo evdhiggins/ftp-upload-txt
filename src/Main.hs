@@ -74,8 +74,7 @@ initFtp h u p = do
     void $ FTP.pasv h
 
 closeFtp :: FTP.Handle -> IO ()
-closeFtp = do
-    void . FTP.quit
+closeFtp = void . FTP.quit
 
 uploadFile :: FTP.Handle -> FilePath -> IO ()
 uploadFile h f = do
