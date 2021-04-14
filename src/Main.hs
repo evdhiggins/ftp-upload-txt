@@ -12,7 +12,7 @@ import qualified Data.Text                  as T
 import           Network.FTP.Client ( RTypeCode (TA) )
 import qualified Network.FTP.Client         as FTP
 import qualified System.Directory           as D
-import           System.Environment ( lookupEnv )
+import           System.Environment ( lookupEnv, getArgs )
 import           Text.Read ( readMaybe )
 
 data Credentials = Credentials { user :: String, pass :: String, host :: String, port :: Int }
@@ -22,8 +22,17 @@ newtype CredentialsException = CredentialsException String
 
 instance Exception CredentialsException
 
-getCredentials :: IO Credentials
-getCredentials = do
+main :: IO ()
+main = do
+    args <- getArgs
+    Credentials { user, pass, host, port } <- case args of
+        [] -> getCredentialsFromEnv
+        _ -> getCredentialsFromArgs
+        
+    handleFtp user pass host port
+
+getCredentialsFromEnv :: IO Credentials
+getCredentialsFromEnv = do
     _ <- loadFile defaultConfig
     u <- nonEmptyString <$> lookupEnv "FTP_USER"
     p <- nonEmptyString <$> lookupEnv "FTP_PASS"
@@ -32,7 +41,17 @@ getCredentials = do
 
     case Credentials <$> u <*> p <*> h <*> pt of
         Just c -> return c
-        _ -> throw $ CredentialsException "Invalid FTP credentials"
+        _ -> throw $ CredentialsException "Invalid FTP credentials in .env file"
+
+getCredentialsFromArgs :: IO Credentials
+getCredentialsFromArgs = do
+    u  <- nonEmptyString . pluck 0 <$> getArgs
+    p  <- nonEmptyString . pluck 1 <$> getArgs
+    h  <- nonEmptyString . pluck 2 <$> getArgs
+    pt <- parsePort      . pluck 3 <$> getArgs
+    case Credentials <$> u <*> p <*> h <*> pt of
+        Just c -> return c
+        _ -> throw $ CredentialsException "Invalid FTP credentials given as arguments"
 
 nonEmptyString :: Maybe String -> Maybe String
 nonEmptyString s = case dropWhile isSpace <$> s of
@@ -47,12 +66,6 @@ parsePort (Just p) = case readMaybe p :: Maybe Int of
         | pt > 0 -> Just pt
         | otherwise -> Nothing
     _ -> Nothing
-
-main :: IO ()
-main = do
-    putStrLn ""
-    Credentials { user, pass, host, port } <- getCredentials
-    handleFtp user pass host port
 
 isTextFile :: FilePath -> Bool
 isTextFile f = (==) ".txt" $ T.takeEnd 4 $ T.pack f
@@ -81,3 +94,8 @@ uploadFile h f = do
     putStrLn $ " - Uploading " ++ show f
     bs <- B.readFile f
     FTP.stor h f bs TA
+
+pluck :: Int -> [a] -> Maybe a
+pluck i arr
+    | length arr <= i = Nothing
+    | otherwise = Just (arr !! i)
