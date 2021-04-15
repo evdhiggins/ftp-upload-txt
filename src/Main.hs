@@ -26,31 +26,30 @@ main :: IO ()
 main = do
     a <- getArgs
     case a of
-        [] -> getCredentialsFromEnv >>= handleFtp
+        []           -> getCredentialsFromEnv >>= handleFtp
         [a, b, c, d] -> getCredentialsFromArgs >>= handleFtp
-        _ -> help
+        _            -> help
 
 getCredentialsFromEnv :: IO Credentials
-getCredentialsFromEnv = do
-    _ <- loadFile defaultConfig
-    u <- nonEmptyString <$> lookupEnv "FTP_USER"
-    p <- nonEmptyString <$> lookupEnv "FTP_PASS"
-    h <- nonEmptyString <$> lookupEnv "FTP_HOST"
-    pt <- parsePort <$> lookupEnv "FTP_PORT"
-
-    case Credentials <$> u <*> p <*> h <*> pt of
-        Just c -> return c
-        _ -> throw $ CredentialsException "Invalid FTP credentials in .env file"
+getCredentialsFromEnv =  do
+    loadFile defaultConfig
+    createCredentialsOrThrow
+        <$> (nonEmptyString <$> lookupEnv "FTP_USER")
+        <*> (nonEmptyString <$> lookupEnv "FTP_PASS")
+        <*> (nonEmptyString <$> lookupEnv "FTP_HOST")
+        <*> (parsePort      <$> lookupEnv "FTP_PORT")
 
 getCredentialsFromArgs :: IO Credentials
-getCredentialsFromArgs = do
-    u  <- nonEmptyString . pluck 0 <$> getArgs
-    p  <- nonEmptyString . pluck 1 <$> getArgs
-    h  <- nonEmptyString . pluck 2 <$> getArgs
-    pt <- parsePort      . pluck 3 <$> getArgs
-    case Credentials <$> u <*> p <*> h <*> pt of
-        Just c -> return c
-        _ -> throw $ CredentialsException "Invalid FTP credentials given as arguments"
+getCredentialsFromArgs = createCredentialsOrThrow
+    <$> (nonEmptyString . pluck 0 <$> getArgs)
+    <*> (nonEmptyString . pluck 1 <$> getArgs)
+    <*> (nonEmptyString . pluck 2 <$> getArgs)
+    <*> (parsePort      . pluck 3 <$> getArgs)
+
+createCredentialsOrThrow :: Maybe String -> Maybe String -> Maybe String ->  Maybe Int -> Credentials
+createCredentialsOrThrow u p h pt = case Credentials <$> u <*> p <*> h <*> pt of
+        Just c -> c
+        _ -> throw $ CredentialsException "Invalid FTP credentials (empty or invalid values)"
 
 nonEmptyString :: Maybe String -> Maybe String
 nonEmptyString s = case dropWhile isSpace <$> s of
@@ -95,17 +94,17 @@ uploadFile h f = do
     FTP.stor h f bs TA
     putStrLn "  Success!"
 
+pluck :: Int -> [a] -> Maybe a
+pluck i arr
+    | length arr <= i = Nothing
+    | otherwise = Just (arr !! i)
+
 help :: IO ()
 help = putStrLn $
-    "ftp-upload-txt\n\n" 
+    "ftp-upload-txt\n\n"
     ++ "This script is used to upload all adjacent .txt files to a target FTP server. "
     ++ "There are two ways provide this script with FTP credentials:\n"
     ++ "  1. Using an adjacent .env file (FTP_USER, FTP_PASS, FTP_HOST, FTP_PORT)\n"
     ++ "  2. Via command line arguments (order: user, pass, host, port)\n\n"
     ++ "Example: `ftp-upload-txt devuser GoodPassword123 ftp.my.server.com 21`\n\n"
     ++ "For more information please review the README."
-
-pluck :: Int -> [a] -> Maybe a
-pluck i arr
-    | length arr <= i = Nothing
-    | otherwise = Just (arr !! i)
