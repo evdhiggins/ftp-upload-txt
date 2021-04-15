@@ -25,10 +25,11 @@ instance Exception CredentialsException
 main :: IO ()
 main = do
     a <- getArgs
+    envExists <- D.doesFileExist "./.env"
     case a of
-        []           -> getCredentialsFromEnv >>= handleFtp
-        [a, b, c, d] -> getCredentialsFromArgs >>= handleFtp
-        _            -> help
+        [] | envExists -> getCredentialsFromEnv  >>= handleFtp
+        [a, b, c, d]   -> getCredentialsFromArgs >>= handleFtp
+        _              -> help
 
 getCredentialsFromEnv :: IO Credentials
 getCredentialsFromEnv =  do
