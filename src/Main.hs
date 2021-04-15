@@ -24,12 +24,11 @@ instance Exception CredentialsException
 
 main :: IO ()
 main = do
-    args <- getArgs
-    Credentials { user, pass, host, port } <- case args of
-        [] -> getCredentialsFromEnv
-        _ -> getCredentialsFromArgs
-        
-    handleFtp user pass host port
+    a <- getArgs
+    case a of
+        [] -> getCredentialsFromEnv >>= handleFtp
+        [a, b, c, d] -> getCredentialsFromArgs >>= handleFtp
+        _ -> help
 
 getCredentialsFromEnv :: IO Credentials
 getCredentialsFromEnv = do
@@ -73,9 +72,9 @@ isTextFile f = (==) ".txt" $ T.takeEnd 4 $ T.pack f
 txtFilePaths :: IO [FilePath]
 txtFilePaths = filter isTextFile <$> D.listDirectory "."
 
-handleFtp :: String -> String -> String -> Int -> IO ()
-handleFtp u p host pt = FTP.withFTP host pt $ \h welcome -> do
-    initFtp h u p
+handleFtp :: Credentials -> IO ()
+handleFtp Credentials { user, pass, host, port } = FTP.withFTP host port $ \h welcome -> do
+    initFtp h user pass
     tp <- txtFilePaths
     putStrLn $ "Found " ++ show (length tp) ++ " file(s) to upload"
     mapM_ (uploadFile h) tp
@@ -91,9 +90,20 @@ closeFtp = void . FTP.quit
 
 uploadFile :: FTP.Handle -> FilePath -> IO ()
 uploadFile h f = do
-    putStrLn $ " - Uploading " ++ show f
+    putStr $ " - Uploading " ++ show f ++ "..."
     bs <- B.readFile f
     FTP.stor h f bs TA
+    putStrLn "  Success!"
+
+help :: IO ()
+help = putStrLn $
+    "ftp-upload-txt\n\n" 
+    ++ "This script is used to upload all adjacent .txt files to a target FTP server. "
+    ++ "There are two ways provide this script with FTP credentials:\n"
+    ++ "  1. Using an adjacent .env file (FTP_USER, FTP_PASS, FTP_HOST, FTP_PORT)\n"
+    ++ "  2. Via command line arguments (order: user, pass, host, port)\n\n"
+    ++ "Example: `ftp-upload-txt devuser GoodPassword123 ftp.my.server.com 21`\n\n"
+    ++ "For more information please review the README."
 
 pluck :: Int -> [a] -> Maybe a
 pluck i arr
