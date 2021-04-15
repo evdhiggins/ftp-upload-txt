@@ -101,11 +101,13 @@ pluck i arr
     | otherwise = Just (arr !! i)
 
 help :: IO ()
-help = putStrLn $
-    "ftp-upload-txt\n\n"
+help = putStrLn
+    ("ftp-upload-txt\n\n"
     ++ "This script is used to upload all adjacent .txt files to a target FTP server. "
     ++ "There are two ways provide this script with FTP credentials:\n"
     ++ "  1. Using an adjacent .env file (FTP_USER, FTP_PASS, FTP_HOST, FTP_PORT)\n"
     ++ "  2. Via command line arguments (order: user, pass, host, port)\n\n"
     ++ "Example: `ftp-upload-txt devuser GoodPassword123 ftp.my.server.com 21`\n\n"
-    ++ "For more information please review the README."
+    ++ "For more information please review the README.\n\n"
+    ++ "-- Press enter to continue\n")
+    *> void getChar 
